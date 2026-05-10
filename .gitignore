@@ -1,0 +1,17 @@
+# Build artifacts
+# main.js is committed so BRAT can install directly from GitHub.
+
+# npm
+node_modules
+
+# IDE
+.idea/
+*.sublime-*
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Obsidian plugin data
+data.json
