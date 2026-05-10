@@ -508,8 +508,11 @@ var PageReaderView = class extends import_obsidian.ItemView {
       if (token !== this.renderToken)
         return;
       const markdown = this.plugin.settings.hideFrontmatter ? stripYamlFrontmatter(rawMarkdown) : rawMarkdown;
+      this.articleEl.empty();
+      this.articleEl.removeClass("is-loading");
+      this.recalculatePages();
       const renderComponent = new import_obsidian.Component();
-      const renderContainer = document.createElement("div");
+      const renderContainer = this.articleEl.createDiv({ cls: "page-reader-render-host" });
       this.addChild(renderComponent);
       this.renderComponent = renderComponent;
       await import_obsidian.MarkdownRenderer.render(this.app, markdown, renderContainer, file.path, renderComponent);
@@ -521,11 +524,10 @@ var PageReaderView = class extends import_obsidian.ItemView {
         }
         return;
       }
-      this.articleEl.empty();
-      this.articleEl.removeClass("is-loading");
       while (renderContainer.firstChild) {
-        this.articleEl.appendChild(renderContainer.firstChild);
+        this.articleEl.insertBefore(renderContainer.firstChild, renderContainer);
       }
+      renderContainer.remove();
       this.prepareRenderedContent();
       await this.nextAnimationFrame();
       if (token !== this.renderToken)

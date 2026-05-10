@@ -635,8 +635,12 @@ class PageReaderView extends ItemView {
         ? stripYamlFrontmatter(rawMarkdown)
         : rawMarkdown;
 
+      this.articleEl.empty();
+      this.articleEl.removeClass("is-loading");
+      this.recalculatePages();
+
       const renderComponent = new Component();
-      const renderContainer = document.createElement("div");
+      const renderContainer = this.articleEl.createDiv({ cls: "page-reader-render-host" });
       this.addChild(renderComponent);
       this.renderComponent = renderComponent;
       await MarkdownRenderer.render(this.app, markdown, renderContainer, file.path, renderComponent);
@@ -649,11 +653,10 @@ class PageReaderView extends ItemView {
         return;
       }
 
-      this.articleEl.empty();
-      this.articleEl.removeClass("is-loading");
       while (renderContainer.firstChild) {
-        this.articleEl.appendChild(renderContainer.firstChild);
+        this.articleEl.insertBefore(renderContainer.firstChild, renderContainer);
       }
+      renderContainer.remove();
 
       this.prepareRenderedContent();
       await this.nextAnimationFrame();
