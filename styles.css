@@ -156,7 +156,6 @@
   box-shadow: var(--page-reader-shadow);
 }
 
-.page-reader-article.markdown-preview-view,
 .page-reader-article.markdown-rendered {
   overflow: visible !important;
   max-width: none;
@@ -233,6 +232,12 @@
 
 .page-reader-article pre,
 .page-reader-article code {
+  white-space: pre-wrap;
+}
+
+.page-reader-plain-fallback {
+  color: var(--page-reader-text);
+  font-family: var(--font-text);
   white-space: pre-wrap;
 }
 

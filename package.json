@@ -1,6 +1,6 @@
 {
   "name": "obsidian-page-reader",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Read long Markdown articles in an Apple Books-style paged reader with swipe navigation and saved reading positions.",
   "main": "main.js",
   "scripts": {

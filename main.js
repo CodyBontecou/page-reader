@@ -60,6 +60,47 @@ function stripYamlFrontmatter(markdown) {
 function fileIdentityMatches(progress, file, pageCount) {
   return progress.fileMtime === file.stat.mtime && progress.fileSize === file.stat.size && progress.pageCount === pageCount;
 }
+function getThemePalette(theme) {
+  switch (theme) {
+    case "paper":
+      return {
+        background: "#e7dfcf",
+        pageBackground: "#fbf7eb",
+        text: "#2b251d",
+        muted: "#756b5c",
+        border: "rgba(77, 64, 45, 0.18)",
+        shadow: "0 18px 52px rgba(61, 49, 33, 0.22)"
+      };
+    case "sepia":
+      return {
+        background: "#d9c7a4",
+        pageBackground: "#f2dfb8",
+        text: "#382710",
+        muted: "#7a6040",
+        border: "rgba(63, 42, 17, 0.18)",
+        shadow: "0 18px 52px rgba(63, 42, 17, 0.2)"
+      };
+    case "night":
+      return {
+        background: "#0c1117",
+        pageBackground: "#111820",
+        text: "#d8e0e8",
+        muted: "#8b98a5",
+        border: "rgba(255, 255, 255, 0.1)",
+        shadow: "0 20px 58px rgba(0, 0, 0, 0.42)"
+      };
+    case "obsidian":
+    default:
+      return {
+        background: "var(--background-primary)",
+        pageBackground: "var(--background-primary)",
+        text: "var(--text-normal)",
+        muted: "var(--text-muted)",
+        border: "var(--background-modifier-border)",
+        shadow: "0 18px 48px rgba(0, 0, 0, 0.12)"
+      };
+  }
+}
 var PageReaderPlugin = class extends import_obsidian.Plugin {
   constructor() {
     super(...arguments);
@@ -328,25 +369,30 @@ var PageReaderView = class extends import_obsidian.ItemView {
   }
   async onOpen() {
     var _a, _b;
-    this.contentEl.empty();
-    this.addAction("refresh-cw", "Refresh pages", () => {
-      void this.renderCurrentFile({ requestedPage: this.pageIndex });
-    });
-    this.addAction("file-text", "Open source note", () => {
-      void this.openSourceNote();
-    });
-    this.addAction("rotate-ccw", "Reset reading position", () => {
-      this.resetCurrentProgress();
-    });
-    this.buildShell();
-    this.registerEvents();
-    const viewState = this.leaf.getViewState().state;
-    const filePath = (_b = (_a = viewState == null ? void 0 : viewState.filePath) != null ? _a : this.filePath) != null ? _b : this.plugin.lastFilePath;
-    const requestedPage = typeof (viewState == null ? void 0 : viewState.pageIndex) === "number" ? viewState.pageIndex : void 0;
-    if (filePath) {
-      await this.loadFileByPath(filePath, requestedPage);
-    } else {
-      this.renderEmptyState();
+    try {
+      this.contentEl.empty();
+      this.addAction("refresh-cw", "Refresh pages", () => {
+        void this.renderCurrentFile({ requestedPage: this.pageIndex });
+      });
+      this.addAction("file-text", "Open source note", () => {
+        void this.openSourceNote();
+      });
+      this.addAction("rotate-ccw", "Reset reading position", () => {
+        this.resetCurrentProgress();
+      });
+      this.buildShell();
+      this.registerEvents();
+      const viewState = this.leaf.getViewState().state;
+      const filePath = (_b = (_a = viewState == null ? void 0 : viewState.filePath) != null ? _a : this.filePath) != null ? _b : this.plugin.lastFilePath;
+      const requestedPage = typeof (viewState == null ? void 0 : viewState.pageIndex) === "number" ? viewState.pageIndex : void 0;
+      if (filePath) {
+        await this.loadFileByPath(filePath, requestedPage);
+      } else {
+        this.renderEmptyState();
+      }
+    } catch (error) {
+      console.error("Page Reader failed to open", error);
+      this.renderFatalError(error);
     }
   }
   async onClose() {
@@ -397,7 +443,7 @@ var PageReaderView = class extends import_obsidian.ItemView {
     this.stageEl = stage;
     const pages = stage.createDiv({ cls: "page-reader-pages" });
     this.pagesEl = pages;
-    const article = pages.createDiv({ cls: "page-reader-article markdown-preview-view markdown-rendered" });
+    const article = pages.createDiv({ cls: "page-reader-article markdown-rendered" });
     this.articleEl = article;
     const previousHit = stage.createEl("button", {
       cls: "page-reader-edge-button page-reader-edge-button-left",
@@ -489,7 +535,7 @@ var PageReaderView = class extends import_obsidian.ItemView {
     await this.renderCurrentFile({ requestedPage });
   }
   async renderCurrentFile(options = {}) {
-    var _a;
+    var _a, _b;
     if (!this.file || !this.articleEl) {
       this.renderEmptyState();
       return;
@@ -515,7 +561,7 @@ var PageReaderView = class extends import_obsidian.ItemView {
       const renderContainer = this.articleEl.createDiv({ cls: "page-reader-render-host" });
       this.addChild(renderComponent);
       this.renderComponent = renderComponent;
-      await import_obsidian.MarkdownRenderer.render(this.app, markdown, renderContainer, file.path, renderComponent);
+      await this.renderMarkdownInto(markdown, renderContainer, file.path, renderComponent);
       if (token !== this.renderToken) {
         if (this.renderComponent === renderComponent) {
           this.unloadRenderComponent();
@@ -528,13 +574,19 @@ var PageReaderView = class extends import_obsidian.ItemView {
         this.articleEl.insertBefore(renderContainer.firstChild, renderContainer);
       }
       renderContainer.remove();
+      if (!((_a = this.articleEl.textContent) == null ? void 0 : _a.trim()) && markdown.trim()) {
+        this.articleEl.createEl("pre", {
+          cls: "page-reader-plain-fallback",
+          text: markdown
+        });
+      }
       this.prepareRenderedContent();
       await this.nextAnimationFrame();
       if (token !== this.renderToken)
         return;
       this.recalculatePages();
       const requestedPage = options.requestedPage;
-      const requestedPercent = (_a = options.requestedPercent) != null ? _a : priorPercent;
+      const requestedPercent = (_b = options.requestedPercent) != null ? _b : priorPercent;
       const restoredPage = this.getInitialPage(file, requestedPage, requestedPercent);
       this.goToPage(restoredPage, { animate: false, save: false });
       this.updateHeader();
@@ -544,6 +596,14 @@ var PageReaderView = class extends import_obsidian.ItemView {
       this.renderMissingState("Page Reader could not render this note.");
       new import_obsidian.Notice("Page Reader could not render this note. Check the developer console for details.");
     }
+  }
+  async renderMarkdownInto(markdown, container, sourcePath, component) {
+    const renderer = import_obsidian.MarkdownRenderer;
+    if (typeof renderer.render === "function") {
+      await renderer.render(this.app, markdown, container, sourcePath, component);
+      return;
+    }
+    await import_obsidian.MarkdownRenderer.renderMarkdown(markdown, container, sourcePath, component);
   }
   prepareRenderedContent() {
     if (!this.articleEl)
@@ -663,12 +723,77 @@ var PageReaderView = class extends import_obsidian.ItemView {
     if (!this.rootEl || !this.articleEl)
       return;
     const settings = this.plugin.settings;
+    const palette = getThemePalette(settings.theme);
     this.rootEl.dataset.theme = settings.theme;
     this.rootEl.toggleClass("is-justified", settings.justifyText);
     this.rootEl.style.setProperty("--page-reader-font-size", `${settings.fontSize}px`);
     this.rootEl.style.setProperty("--page-reader-line-height", settings.lineHeight.toString());
     this.rootEl.style.setProperty("--page-reader-padding", `${settings.pagePadding}px`);
     this.rootEl.style.setProperty("--page-reader-gap", `${settings.columnGap}px`);
+    this.rootEl.style.setProperty("--page-reader-bg", palette.background);
+    this.rootEl.style.setProperty("--page-reader-page-bg", palette.pageBackground);
+    this.rootEl.style.setProperty("--page-reader-text", palette.text);
+    this.rootEl.style.setProperty("--page-reader-muted", palette.muted);
+    this.rootEl.style.setProperty("--page-reader-border", palette.border);
+    this.rootEl.style.setProperty("--page-reader-shadow", palette.shadow);
+    this.applyCriticalInlineStyles(palette);
+  }
+  applyCriticalInlineStyles(palette) {
+    if (!this.rootEl || !this.articleEl)
+      return;
+    Object.assign(this.contentEl.style, {
+      padding: "0",
+      overflow: "hidden"
+    });
+    Object.assign(this.rootEl.style, {
+      display: "flex",
+      flexDirection: "column",
+      height: "100%",
+      minHeight: "0",
+      background: palette.background,
+      color: palette.text
+    });
+    this.rootEl.querySelectorAll(".page-reader-toolbar, .page-reader-footer").forEach((element) => {
+      Object.assign(element.style, {
+        flex: "0 0 auto",
+        color: palette.text,
+        background: palette.pageBackground,
+        borderColor: palette.border
+      });
+    });
+    if (this.stageEl) {
+      Object.assign(this.stageEl.style, {
+        position: "relative",
+        display: "flex",
+        flex: "1 1 auto",
+        minHeight: "0",
+        overflow: "hidden"
+      });
+    }
+    if (this.pagesEl) {
+      Object.assign(this.pagesEl.style, {
+        position: "absolute",
+        inset: "18px",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        padding: `${this.plugin.settings.pagePadding}px`,
+        background: palette.pageBackground,
+        border: `1px solid ${palette.border}`,
+        borderRadius: "24px",
+        boxShadow: palette.shadow
+      });
+    }
+    Object.assign(this.articleEl.style, {
+      overflow: "visible",
+      maxWidth: "none",
+      margin: "0",
+      padding: "0",
+      color: palette.text,
+      background: "transparent",
+      fontSize: `${this.plugin.settings.fontSize}px`,
+      lineHeight: this.plugin.settings.lineHeight.toString(),
+      columnFill: "auto"
+    });
   }
   renderEmptyState() {
     this.unloadRenderComponent();
@@ -709,6 +834,30 @@ var PageReaderView = class extends import_obsidian.ItemView {
     this.articleEl.createEl("h2", { text: "Cannot open note" });
     this.articleEl.createEl("p", { text: message });
     this.recalculatePages();
+  }
+  renderFatalError(error) {
+    var _a;
+    this.contentEl.empty();
+    const palette = getThemePalette(this.plugin.settings.theme);
+    const root = this.contentEl.createDiv({ cls: "page-reader-root" });
+    Object.assign(root.style, {
+      boxSizing: "border-box",
+      height: "100%",
+      padding: "24px",
+      overflow: "auto",
+      background: palette.pageBackground,
+      color: palette.text,
+      fontSize: "16px",
+      lineHeight: "1.5"
+    });
+    root.createEl("h2", { text: "Page Reader hit an error" });
+    root.createEl("p", {
+      text: "The reader view could not finish opening. This version shows the error here instead of leaving a blank page."
+    });
+    root.createEl("pre", {
+      text: error instanceof Error ? `${error.name}: ${error.message}
+${(_a = error.stack) != null ? _a : ""}` : String(error)
+    });
   }
   handleKeydown(event) {
     if (event.defaultPrevented)

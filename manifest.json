@@ -1,7 +1,7 @@
 {
   "id": "page-reader",
   "name": "Page Reader",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "minAppVersion": "1.5.0",
   "description": "Read long notes and clipped articles in a paged, swipeable Apple Books-style reader that remembers your place.",
   "author": "Cody Bontecou",
