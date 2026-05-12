@@ -173,7 +173,10 @@
   padding: 0;
   color: var(--page-reader-text);
   background: transparent;
-  column-fill: auto;
+  column-count: auto;
+  column-fill: balance;
+  column-gap: normal;
+  column-width: auto;
   font-size: var(--page-reader-font-size);
   line-height: var(--page-reader-line-height);
   overflow-wrap: break-word;
@@ -182,7 +185,7 @@
 }
 
 .page-reader-article.is-turning {
-  transition: left 230ms cubic-bezier(0.2, 0.72, 0.18, 1);
+  transition: left 180ms cubic-bezier(0.2, 0.72, 0.18, 1);
 }
 
 .page-reader-root.is-justified .page-reader-article p,

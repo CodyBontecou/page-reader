@@ -341,7 +341,6 @@ var PageReaderView = class extends import_obsidian.ItemView {
     this.pageCount = 1;
     this.pageWidth = MIN_PAGE_WIDTH;
     this.pageHeight = 1;
-    this.columnGap = DEFAULT_SETTINGS.columnGap;
     this.rootEl = null;
     this.titleEl = null;
     this.subtitleEl = null;
@@ -660,16 +659,17 @@ var PageReaderView = class extends import_obsidian.ItemView {
     const padding = this.plugin.settings.pagePadding;
     const width = Math.max(MIN_PAGE_WIDTH, Math.floor(this.pagesEl.clientWidth - padding * 2));
     const height = Math.max(1, Math.floor(this.pagesEl.clientHeight - padding * 2));
-    const gap = this.plugin.settings.columnGap;
     this.pageWidth = width;
     this.pageHeight = height;
-    this.columnGap = gap;
     this.articleEl.style.width = `${width}px`;
-    this.articleEl.style.height = `${height}px`;
-    this.articleEl.style.columnWidth = `${width}px`;
-    this.articleEl.style.columnGap = `${gap}px`;
-    const totalWidth = Math.max(width, this.articleEl.scrollWidth);
-    this.pageCount = Math.max(1, Math.round((totalWidth + gap) / (width + gap)));
+    this.articleEl.style.minHeight = `${height}px`;
+    this.articleEl.style.height = "auto";
+    this.articleEl.style.maxHeight = "none";
+    this.articleEl.style.columnWidth = "auto";
+    this.articleEl.style.columnGap = "normal";
+    this.articleEl.style.columnCount = "auto";
+    const totalHeight = Math.max(height, this.articleEl.scrollHeight);
+    this.pageCount = Math.max(1, Math.ceil(totalHeight / height));
     this.pageIndex = clamp(this.pageIndex, 0, this.pageCount - 1);
     this.updateTransform(false);
     this.updateProgressUi();
@@ -711,11 +711,19 @@ var PageReaderView = class extends import_obsidian.ItemView {
   updateTransform(animate, dragOffset = 0) {
     if (!this.articleEl)
       return;
-    const x = -this.pageIndex * (this.pageWidth + this.columnGap) + dragOffset;
+    const pageTop = this.pageIndex * this.pageHeight;
     this.articleEl.toggleClass("is-turning", animate);
     this.articleEl.style.transform = "none";
     this.articleEl.style.willChange = "auto";
-    this.articleEl.style.left = `${x}px`;
+    this.articleEl.style.left = `${dragOffset}px`;
+    if (!this.pagesEl)
+      return;
+    this.pagesEl.scrollLeft = 0;
+    if (animate && typeof this.pagesEl.scrollTo === "function") {
+      this.pagesEl.scrollTo({ left: 0, top: pageTop, behavior: "smooth" });
+    } else {
+      this.pagesEl.scrollTop = pageTop;
+    }
   }
   updateProgressUi() {
     var _a, _b;
@@ -812,6 +820,7 @@ var PageReaderView = class extends import_obsidian.ItemView {
         overflow: "hidden",
         boxSizing: "border-box",
         padding: `${this.plugin.settings.pagePadding}px`,
+        scrollBehavior: "auto",
         background: palette.pageBackground,
         border: `1px solid ${palette.border}`,
         borderRadius: "24px",
@@ -820,6 +829,7 @@ var PageReaderView = class extends import_obsidian.ItemView {
     }
     Object.assign(this.articleEl.style, {
       position: "relative",
+      left: "0",
       overflow: "visible",
       maxWidth: "none",
       margin: "0",
@@ -828,7 +838,10 @@ var PageReaderView = class extends import_obsidian.ItemView {
       background: "transparent",
       fontSize: `${this.plugin.settings.fontSize}px`,
       lineHeight: this.plugin.settings.lineHeight.toString(),
-      columnFill: "auto",
+      columnWidth: "auto",
+      columnGap: "normal",
+      columnCount: "auto",
+      columnFill: "balance",
       transform: "none",
       willChange: "auto"
     });
