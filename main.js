@@ -43,8 +43,31 @@ var DEFAULT_SETTINGS = {
   openInNewTab: true,
   turnPageWithVerticalScroll: false
 };
+var READER_THEMES = ["obsidian", "paper", "sepia", "night"];
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+function clampNumber(value, fallback, min, max) {
+  return typeof value === "number" && Number.isFinite(value) ? clamp(value, min, max) : fallback;
+}
+function normalizeBoolean(value, fallback) {
+  return typeof value === "boolean" ? value : fallback;
+}
+function normalizeSettings(settings) {
+  return {
+    fontSize: clampNumber(settings == null ? void 0 : settings.fontSize, DEFAULT_SETTINGS.fontSize, 14, 28),
+    lineHeight: clampNumber(settings == null ? void 0 : settings.lineHeight, DEFAULT_SETTINGS.lineHeight, 1.2, 2),
+    columnGap: clampNumber(settings == null ? void 0 : settings.columnGap, DEFAULT_SETTINGS.columnGap, 24, 120),
+    pagePadding: clampNumber(settings == null ? void 0 : settings.pagePadding, DEFAULT_SETTINGS.pagePadding, 16, 72),
+    theme: READER_THEMES.includes(settings == null ? void 0 : settings.theme) ? settings == null ? void 0 : settings.theme : DEFAULT_SETTINGS.theme,
+    justifyText: normalizeBoolean(settings == null ? void 0 : settings.justifyText, DEFAULT_SETTINGS.justifyText),
+    hideFrontmatter: normalizeBoolean(settings == null ? void 0 : settings.hideFrontmatter, DEFAULT_SETTINGS.hideFrontmatter),
+    openInNewTab: normalizeBoolean(settings == null ? void 0 : settings.openInNewTab, DEFAULT_SETTINGS.openInNewTab),
+    turnPageWithVerticalScroll: normalizeBoolean(
+      settings == null ? void 0 : settings.turnPageWithVerticalScroll,
+      DEFAULT_SETTINGS.turnPageWithVerticalScroll
+    )
+  };
 }
 function getPercent(pageIndex, pageCount) {
   if (pageCount <= 1)
@@ -178,11 +201,11 @@ var PageReaderPlugin = class extends import_obsidian.Plugin {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_PAGE_READER);
   }
   async loadPluginData() {
-    var _a, _b, _c;
+    var _a, _b;
     const data = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, (_a = data == null ? void 0 : data.settings) != null ? _a : {});
-    this.progress = (_b = data == null ? void 0 : data.progress) != null ? _b : {};
-    this.lastFilePath = (_c = data == null ? void 0 : data.lastFilePath) != null ? _c : null;
+    this.settings = normalizeSettings(data == null ? void 0 : data.settings);
+    this.progress = (_a = data == null ? void 0 : data.progress) != null ? _a : {};
+    this.lastFilePath = (_b = data == null ? void 0 : data.lastFilePath) != null ? _b : null;
   }
   async savePluginData() {
     const data = {
@@ -690,7 +713,9 @@ var PageReaderView = class extends import_obsidian.ItemView {
       return;
     const x = -this.pageIndex * (this.pageWidth + this.columnGap) + dragOffset;
     this.articleEl.toggleClass("is-turning", animate);
-    this.articleEl.style.transform = `translate3d(${x}px, 0, 0)`;
+    this.articleEl.style.transform = "none";
+    this.articleEl.style.willChange = "auto";
+    this.articleEl.style.left = `${x}px`;
   }
   updateProgressUi() {
     var _a, _b;
@@ -742,14 +767,24 @@ var PageReaderView = class extends import_obsidian.ItemView {
     if (!this.rootEl || !this.articleEl)
       return;
     Object.assign(this.contentEl.style, {
-      padding: "0",
-      overflow: "hidden"
-    });
-    Object.assign(this.rootEl.style, {
       display: "flex",
       flexDirection: "column",
       height: "100%",
       minHeight: "0",
+      padding: "0",
+      overflow: "hidden",
+      background: palette.background,
+      color: palette.text
+    });
+    Object.assign(this.rootEl.style, {
+      display: "flex",
+      flex: "1 1 auto",
+      flexDirection: "column",
+      width: "100%",
+      height: "100%",
+      minHeight: "0",
+      boxSizing: "border-box",
+      overflow: "hidden",
       background: palette.background,
       color: palette.text
     });
@@ -784,6 +819,7 @@ var PageReaderView = class extends import_obsidian.ItemView {
       });
     }
     Object.assign(this.articleEl.style, {
+      position: "relative",
       overflow: "visible",
       maxWidth: "none",
       margin: "0",
@@ -792,7 +828,9 @@ var PageReaderView = class extends import_obsidian.ItemView {
       background: "transparent",
       fontSize: `${this.plugin.settings.fontSize}px`,
       lineHeight: this.plugin.settings.lineHeight.toString(),
-      columnFill: "auto"
+      columnFill: "auto",
+      transform: "none",
+      willChange: "auto"
     });
   }
   renderEmptyState() {

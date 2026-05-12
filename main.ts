@@ -77,8 +77,37 @@ const DEFAULT_SETTINGS: PageReaderSettings = {
   turnPageWithVerticalScroll: false,
 };
 
+const READER_THEMES: ReaderTheme[] = ["obsidian", "paper", "sepia", "night"];
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? clamp(value, min, max) : fallback;
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeSettings(settings: Partial<PageReaderSettings> | null | undefined): PageReaderSettings {
+  return {
+    fontSize: clampNumber(settings?.fontSize, DEFAULT_SETTINGS.fontSize, 14, 28),
+    lineHeight: clampNumber(settings?.lineHeight, DEFAULT_SETTINGS.lineHeight, 1.2, 2),
+    columnGap: clampNumber(settings?.columnGap, DEFAULT_SETTINGS.columnGap, 24, 120),
+    pagePadding: clampNumber(settings?.pagePadding, DEFAULT_SETTINGS.pagePadding, 16, 72),
+    theme: READER_THEMES.includes(settings?.theme as ReaderTheme)
+      ? (settings?.theme as ReaderTheme)
+      : DEFAULT_SETTINGS.theme,
+    justifyText: normalizeBoolean(settings?.justifyText, DEFAULT_SETTINGS.justifyText),
+    hideFrontmatter: normalizeBoolean(settings?.hideFrontmatter, DEFAULT_SETTINGS.hideFrontmatter),
+    openInNewTab: normalizeBoolean(settings?.openInNewTab, DEFAULT_SETTINGS.openInNewTab),
+    turnPageWithVerticalScroll: normalizeBoolean(
+      settings?.turnPageWithVerticalScroll,
+      DEFAULT_SETTINGS.turnPageWithVerticalScroll
+    ),
+  };
 }
 
 function getPercent(pageIndex: number, pageCount: number): number {
@@ -239,7 +268,7 @@ export default class PageReaderPlugin extends Plugin {
   async loadPluginData(): Promise<void> {
     const data = (await this.loadData()) as Partial<PageReaderPluginData> | null;
 
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings ?? {});
+    this.settings = normalizeSettings(data?.settings);
     this.progress = data?.progress ?? {};
     this.lastFilePath = data?.lastFilePath ?? null;
   }
@@ -863,7 +892,14 @@ class PageReaderView extends ItemView {
 
     const x = -this.pageIndex * (this.pageWidth + this.columnGap) + dragOffset;
     this.articleEl.toggleClass("is-turning", animate);
-    this.articleEl.style.transform = `translate3d(${x}px, 0, 0)`;
+
+    // Avoid translate3d/will-change on the multi-column article. Chromium/Electron can
+    // paint large composited CSS-column layers as solid black rectangles, which made the
+    // reader look like an empty black view for some notes. Relative positioning keeps the
+    // same pagination behavior without forcing that fragile GPU layer.
+    this.articleEl.style.transform = "none";
+    this.articleEl.style.willChange = "auto";
+    this.articleEl.style.left = `${x}px`;
   }
 
   private updateProgressUi(): void {
@@ -924,15 +960,25 @@ class PageReaderView extends ItemView {
     if (!this.rootEl || !this.articleEl) return;
 
     Object.assign(this.contentEl.style, {
-      padding: "0",
-      overflow: "hidden",
-    });
-
-    Object.assign(this.rootEl.style, {
       display: "flex",
       flexDirection: "column",
       height: "100%",
       minHeight: "0",
+      padding: "0",
+      overflow: "hidden",
+      background: palette.background,
+      color: palette.text,
+    });
+
+    Object.assign(this.rootEl.style, {
+      display: "flex",
+      flex: "1 1 auto",
+      flexDirection: "column",
+      width: "100%",
+      height: "100%",
+      minHeight: "0",
+      boxSizing: "border-box",
+      overflow: "hidden",
       background: palette.background,
       color: palette.text,
     });
@@ -971,6 +1017,7 @@ class PageReaderView extends ItemView {
     }
 
     Object.assign(this.articleEl.style, {
+      position: "relative",
       overflow: "visible",
       maxWidth: "none",
       margin: "0",
@@ -980,6 +1027,8 @@ class PageReaderView extends ItemView {
       fontSize: `${this.plugin.settings.fontSize}px`,
       lineHeight: this.plugin.settings.lineHeight.toString(),
       columnFill: "auto",
+      transform: "none",
+      willChange: "auto",
     });
   }
 
